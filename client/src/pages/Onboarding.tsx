@@ -57,7 +57,8 @@ export default function Onboarding() {
         experienceLevel: formData.experienceLevel || "beginner",
         equipment: formData.equipment.length > 0 ? formData.equipment : ["bodyweight"],
       });
-      setLocation("/dashboard");
+      // Redirect to plan generation page
+      setLocation("/plans");
     } catch (error) {
       console.error("Submission failed", error);
     }

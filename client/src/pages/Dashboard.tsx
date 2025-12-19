@@ -1,16 +1,25 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrentPlan } from "@/hooks/use-plans";
+import { useCurrentPlan, useProfile } from "@/hooks/use-plans";
 import { Layout } from "@/components/Layout";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkoutCard } from "@/components/WorkoutCard";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 import { Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: plan, isLoading: planLoading } = useCurrentPlan();
   const [_, setLocation] = useLocation();
+
+  // Redirect to onboarding if no profile
+  useEffect(() => {
+    if (!profileLoading && !profile) {
+      setLocation("/onboarding");
+    }
+  }, [profile, profileLoading, setLocation]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -19,12 +28,17 @@ export default function Dashboard() {
     return "Good evening";
   };
 
-  if (planLoading) {
+  if (profileLoading || planLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-primary">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
+  }
+
+  // If no profile, show loading (redirect happens in useEffect)
+  if (!profile) {
+    return null;
   }
 
   // If no plan, redirect to plan generation or show empty state
