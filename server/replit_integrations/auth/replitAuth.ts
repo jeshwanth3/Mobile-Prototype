@@ -81,7 +81,9 @@ export async function setupAuth(app: Express) {
 // DEMO_AUTH mode: bypass Replit OIDC entirely and treat every visitor as the same user.
 // This is meant for prototypes only (everyone shares one account).
 if (DEMO_AUTH) {
-  const demo = getDemoUser();
+  //const demo = getDemoUser();
+  const id = process.env.DEMO_USER_ID ?? "testlogin";
+
 
   // Ensure a user row exists so /api/auth/user returns a real User record.
   await authStorage.upsertUser({
