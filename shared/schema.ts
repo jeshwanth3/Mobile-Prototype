@@ -32,7 +32,7 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   }),
 }));
 
-export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({ id: true });
+export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({ id: true, userId: true });
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
 

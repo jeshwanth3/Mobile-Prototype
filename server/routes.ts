@@ -33,12 +33,16 @@ export async function registerRoutes(
   app.post(api.onboarding.createProfile.path, isAuthenticated, async (req: any, res) => {
     try {
       const input = api.onboarding.createProfile.input.parse(req.body);
-      const profile = await storage.createProfile({ ...input, userId: req.user.claims.sub });
+      const profile = await storage.createProfile({ 
+        ...input, 
+        userId: req.user.claims.sub 
+      });
       res.status(201).json(profile);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      console.error("Profile creation error:", err);
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
