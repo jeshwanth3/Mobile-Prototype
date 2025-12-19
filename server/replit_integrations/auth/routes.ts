@@ -1,264 +1,155 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { api } from "@shared/routes";
-import { z } from "zod";
+import * as client from "openid-client";
+import { Strategy, type VerifyFunction } from "openid-client/passport";
 
-import { setupAuth, isAuthenticated } from "./replit_integrations/auth/replitAuth";
-import { registerAuthRoutes } from "./replit_integrations/auth/routes";
+import passport from "passport";
+import session from "express-session";
+import type { Express, RequestHandler } from "express";
+import memoize from "memoizee";
+import connectPg from "connect-pg-simple";
+import { authStorage } from "./storage";
 
-import { registerChatRoutes } from "./replit_integrations/chat";
-import { registerImageRoutes } from "./replit_integrations/image";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
-
-
-const ENABLE_TEST_LOGIN =
-  process.env.ENABLE_TEST_LOGIN === "1" ||
-  process.env.ENABLE_TEST_LOGIN === "true" ||
-  process.env.ENABLE_TEST_LOGIN === "yes";
-
-const IS_DEMO_AUTH =
+const DEMO_AUTH =
   process.env.DEMO_AUTH === "1" ||
   process.env.DEMO_AUTH === "true" ||
   process.env.DEMO_AUTH === "yes";
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
-  // Initialize Auth
-  await setupAuth(app);
-  registerAuthRoutes(app);
-  registerChatRoutes(app);
-  registerImageRoutes(app);
+function getDemoUser() {
+  const id = process.env.DEMO_USER_ID ?? "test-user-001";
+  const email = process.env.DEMO_USER_EMAIL ?? "test@fittracker.com";
+  const firstName = process.env.DEMO_FIRST_NAME ?? "Test";
+  const lastName = process.env.DEMO_LAST_NAME ?? "User";
+  const profileImageUrl = process.env.DEMO_PROFILE_IMAGE_URL ?? null;
 
-  // === Test Login (Prototype / Optional) ===
-// WARNING: This is not real authentication. Only enable for demos.
-if (process.env.NODE_ENV === "development" || ENABLE_TEST_LOGIN || IS_DEMO_AUTH) {
-  app.post("/api/test-login", async (req: any, res) => {
-    const testEmail = process.env.TEST_LOGIN_EMAIL ?? "test@fittracker.com";
-    const testPassword = process.env.TEST_LOGIN_PASSWORD ?? "test123";
-    const testUserId = process.env.TEST_LOGIN_USER_ID ?? process.env.DEMO_USER_ID ?? "test-user-001";
+  return { id, email, firstName, lastName, profileImageUrl };
+}
 
-    const { email, password } = req.body ?? {};
+const getOidcConfig = memoize(
+  async () => {
+    return await client.discovery(
+      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
+      process.env.REPL_ID!
+    );
+  },
+  { maxAge: 3600 * 1000 }
+);
 
-    if (email === testEmail && password === testPassword) {
-      // Make sure the user exists in the DB so /api/auth/user returns a real record.
-      await storage.upsertUser({
-        id: testUserId,
-        email: testEmail,
-        firstName: "Test",
-        lastName: "User",
-      });
+export function getSession() {
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    ttl: sessionTtl,
+    tableName: "sessions",
+  });
 
+  return session({
+    secret: process.env.SESSION_SECRET!,
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: true,
+      maxAge: sessionTtl,
+    },
+  });
+}
+
+function updateUserSession(
+  user: any,
+  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
+) {
+  user.claims = tokens.claims();
+  user.access_token = tokens.access_token;
+  user.refresh_token = tokens.refresh_token;
+  user.expires_at = user.claims?.exp;
+}
+
+async function upsertUser(claims: any) {
+  await authStorage.upsertUser({
+    id: claims["sub"],
+    email: claims["email"],
+    firstName: claims["first_name"],
+    lastName: claims["last_name"],
+    profileImageUrl: claims["profile_image_url"],
+  });
+}
+
+export async function setupAuth(app: Express) {
+  // DEMO_AUTH mode: bypass Replit OIDC entirely and treat every visitor as the same user.
+  // This is meant for prototypes only (everyone shares one account).
+  if (DEMO_AUTH) {
+    const demo = getDemoUser();
+
+    // Ensure a user row exists so /api/auth/user returns a real User record.
+    await authStorage.upsertUser({
+      id: demo.id,
+      email: demo.email,
+      firstName: demo.firstName,
+      lastName: demo.lastName,
+      profileImageUrl: demo.profileImageUrl ?? undefined,
+    });
+
+    app.set("trust proxy", 1);
+    app.use(getSession());
+
+    // Inject a stable "logged in" user into every request.
+    app.use((req: any, _res, next) => {
       const farFuture = Math.floor(Date.now() / 1000) + 10 * 365 * 24 * 60 * 60;
+      req.user = {
+        expires_at: farFuture,
+        refresh_token: null,
+        claims: {
+          sub: demo.id,
+          email: demo.email,
+          first_name: demo.firstName,
+          last_name: demo.lastName,
+          profile_image_url: demo.profileImageUrl,
+        },
+      };
 
-      // If passport is active, persist the "login" in the session.
-      if (typeof req.login === "function") {
-        req.login(
-          {
-            expires_at: farFuture,
-            refresh_token: null,
-            claims: {
-              sub: testUserId,
-              email: testEmail,
-              first_name: "Test",
-              last_name: "User",
-            },
-          },
-          (err: any) => {
-            if (err) return res.status(500).json({ message: "Login failed" });
-            res.json({ message: "Test login successful", userId: testUserId });
-          }
-        );
-        return;
-      }
-
-      // If passport isn't active (e.g. DEMO_AUTH bypass), the request is already authenticated.
-      return res.json({ message: "Test login successful", userId: testUserId });
-    }
-
-    return res.status(401).json({
-      message: `Invalid credentials. Use ${testEmail} / ${testPassword}`,
+      // Passport normally adds this, but we bypass passport in demo mode.
+      req.isAuthenticated = () => true;
+      next();
     });
-  });
-}
 
-  // === Onboarding Routes ===
-  app.get(api.onboarding.getProfile.path, isAuthenticated, async (req: any, res) => {
-    const profile = await storage.getProfile(req.user.claims.sub);
-    if (!profile) return res.status(404).json({ message: "Profile not found" });
-    res.json(profile);
-  });
+    // Keep existing client behavior: clicking "Get Started" hits /api/login.
+    app.get("/api/login", (_req, res) => res.redirect("/"));
 
-  app.post(api.onboarding.createProfile.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const input = api.onboarding.createProfile.input.parse(req.body);
-      const profile = await storage.createProfile({ 
-        ...input, 
-        userId: req.user.claims.sub 
-      });
-      res.status(201).json(profile);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+    // Best-effort logout (clears session cookie), then back home.
+    app.get("/api/logout", (req: any, res) => {
+      try {
+        req.session?.destroy(() => res.redirect("/"));
+      } catch {
+        res.redirect("/");
       }
-      console.error("Profile creation error:", err);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  app.put(api.onboarding.updateProfile.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const input = api.onboarding.updateProfile.input.parse(req.body);
-      const profile = await storage.updateProfile(req.user.claims.sub, input);
-      res.json(profile);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // === Plans Routes ===
-  app.get(api.plans.getCurrent.path, isAuthenticated, async (req: any, res) => {
-    const plan = await storage.getCurrentPlan(req.user.claims.sub);
-    if (!plan) return res.status(404).json({ message: "No active plan" });
-    const workouts = await storage.getPlanWorkouts(plan.id);
-    res.json({ ...plan, workouts });
-  });
-
-  app.post(api.plans.generate.path, isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const profile = await storage.getProfile(userId);
-
-      if (!profile) return res.status(400).json({ message: "Complete onboarding first" });
-
-      // Call OpenAI to generate plan
-      const prompt = `
-        Generate a 4-week fitness plan for a user with the following profile:
-        - Goal: ${profile.goal}
-        - Experience: ${profile.experienceLevel}
-        - Days/Week: ${profile.daysPerWeek}
-        - Equipment: ${JSON.stringify(profile.equipment)}
-        - Injuries: ${JSON.stringify(profile.injuries)}
-
-        Return a JSON object with:
-        {
-          "name": "Plan Name",
-          "weeklySchedule": ["Monday", "Wednesday", "Friday"],
-          "workouts": [
-            {
-              "dayNumber": 1,
-              "name": "Workout Name",
-              "description": "Focus area",
-              "exercises": [
-                {
-                  "name": "Exercise Name",
-                  "targetSets": 3,
-                  "targetReps": "10-12",
-                  "targetRPE": 8,
-                  "restSeconds": 60,
-                  "notes": "Technique notes"
-                }
-              ]
-            }
-          ]
-        }
-        Only generate unique workouts for the weekly schedule (e.g. Workout A, Workout B).
-      `;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-5.1",
-        messages: [{ role: "system", content: "You are an expert fitness coach." }, { role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      });
-
-      const planData = JSON.parse(completion.choices[0].message.content || "{}");
-
-      // Save Plan
-      const plan = await storage.createPlan({
-        userId,
-        name: planData.name,
-        weeklySchedule: planData.weeklySchedule,
-        status: 'active'
-      });
-
-      // Save Workouts & Exercises
-      for (const w of planData.workouts) {
-        const workout = await storage.createWorkout({
-          planId: plan.id,
-          dayNumber: w.dayNumber,
-          name: w.name,
-          description: w.description
-        });
-
-        let order = 1;
-        for (const e of w.exercises) {
-          await storage.createExercise({
-            workoutId: workout.id,
-            name: e.name,
-            targetSets: e.targetSets,
-            targetReps: e.targetReps,
-            targetRPE: e.targetRPE,
-            restSeconds: e.restSeconds,
-            notes: e.notes,
-            order: order++
-          });
-        }
-      }
-
-      res.status(201).json(plan);
-    } catch (error) {
-      console.error("Plan generation error:", error);
-      res.status(500).json({ message: "Failed to generate plan" });
-    }
-  });
-
-  // === Workouts Routes ===
-  app.get(api.workouts.get.path, isAuthenticated, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const workout = await storage.getWorkout(id);
-    if (!workout) return res.status(404).json({ message: "Workout not found" });
-    const exercises = await storage.getWorkoutExercises(id);
-    res.json({ ...workout, exercises });
-  });
-
-  // === Logging Routes ===
-  app.post(api.logs.start.path, isAuthenticated, async (req: any, res) => {
-    const { workoutId } = req.body;
-    const log = await storage.createWorkoutLog({
-      userId: req.user.claims.sub,
-      workoutId,
-      status: 'in_progress',
-      date: new Date() // Explicitly set date
     });
-    res.status(201).json(log);
-  });
 
-  app.post(api.logs.complete.path, isAuthenticated, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const log = await storage.completeWorkoutLog(id);
-    res.json(log);
-  });
+    return;
+  }
 
-  app.post(api.logs.logSet.path, isAuthenticated, async (req, res) => {
-    const input = api.logs.logSet.input.parse(req.body);
-    const setLog = await storage.createSetLog(input);
-    res.status(201).json(setLog);
-  });
+  app.set("trust proxy", 1);
+  app.use(getSession());
+  app.use(passport.initialize());
+  app.use(passport.session());
 
-  app.get(api.logs.getHistory.path, isAuthenticated, async (req: any, res) => {
-     const logs = await storage.getWorkoutLogs(req.user.claims.sub);
-     res.json(logs);
-  });
+  const config = await getOidcConfig();
 
-  return httpServer;
-}
+  const verify: VerifyFunction = async (
+    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+    verified: passport.AuthenticateCallback
+  ) => {
+    const user = {};
+    updateUserSession(user, tokens);
+    await upsertUser(tokens.claims());
+    verified(null, user);
+  };
+
+  // Keep track of registered strategies
+  const registeredStrategies = new Set<string>();
+
+  // Helper function to ensure strategy exists for a domain
+  const ensureStrategy = (domain: string) => {
+    const strategyName = `replitauth:${domain}`;
+    if (!registeredStrategies.has(strategyName))
