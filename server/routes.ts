@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth/replitAuth";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import OpenAI from "openai";
