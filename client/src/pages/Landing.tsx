@@ -1,17 +1,29 @@
 import { useAuth } from "@/hooks/use-auth";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, ArrowRight } from "lucide-react";
+import { Dumbbell, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Landing() {
   const { user, isLoading } = useAuth();
   const [_, setLocation] = useLocation();
 
-  if (isLoading) return null;
+  useEffect(() => {
+    if (!isLoading && user) {
+      setLocation("/dashboard");
+    }
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (user) {
-    setLocation("/dashboard");
     return null;
   }
 

@@ -54,6 +54,17 @@ export function useCurrentPlan() {
   });
 }
 
+export function useWorkoutsList() {
+  return useQuery({
+    queryKey: [api.workouts.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.workouts.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch workouts");
+      return (await res.json()) as any[];
+    },
+  });
+}
+
 export function useGeneratePlan() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
