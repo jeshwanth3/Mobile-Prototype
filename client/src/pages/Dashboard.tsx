@@ -1,10 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrentPlan, useWorkoutsList } from "@/hooks/use-plans";
+import { useCurrentPlan } from "@/hooks/use-plans";
 import { Layout } from "@/components/Layout";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkoutCard } from "@/components/WorkoutCard";
 import { useLocation } from "wouter";
-import { Loader2, Plus, Zap } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
@@ -107,7 +107,7 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold text-white">Weekly Schedule</h2>
-        <Link href="/plans" className="text-xs text-primary font-medium">View Plan</Link>
+        <button onClick={() => setLocation("/plans")} className="text-xs text-primary font-medium hover:underline">View Plan</button>
       </div>
 
       <div className="space-y-3">
