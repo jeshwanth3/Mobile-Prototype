@@ -66,6 +66,17 @@ export default function Landing() {
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             
+            {import.meta.env.DEV && (
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="w-full h-14 text-base font-bold rounded-xl"
+                onClick={() => window.location.href = "/test-login"}
+              >
+                Test Login (Dev Only)
+              </Button>
+            )}
+            
             <p className="text-xs text-center text-muted-foreground/50 mt-6">
               Powered by Replit AI & OpenAI GPT-5
             </p>

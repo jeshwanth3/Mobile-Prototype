@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 
 // Pages
 import Landing from "@/pages/Landing";
+import TestLogin from "@/pages/TestLogin";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import WorkoutDetail from "@/pages/WorkoutDetail";
@@ -44,8 +45,9 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 function Router() {
   return (
     <Switch>
-      {/* Public Route */}
+      {/* Public Routes */}
       <Route path="/" component={Landing} />
+      <Route path="/test-login" component={TestLogin} />
 
       {/* Protected Routes */}
       <Route path="/onboarding">
