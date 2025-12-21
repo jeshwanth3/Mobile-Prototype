@@ -24,26 +24,24 @@ export async function registerRoutes(
   registerChatRoutes(app);
   registerImageRoutes(app);
 
-  // === Test Login (Development Only) ===
-  if (process.env.NODE_ENV === "development") {
-    app.post("/api/test-login", (req: any, res) => {
-      const testEmail = "test@fittracker.com";
-      const testPassword = "test123";
-      const testUserId = "test-user-001";
-      
-      const { email, password } = req.body;
-      
-      if (email === testEmail && password === testPassword) {
-        // Create/upsert test user
-        req.login({ claims: { sub: testUserId, email: testEmail, first_name: "Test", last_name: "User" } }, (err) => {
-          if (err) return res.status(500).json({ message: "Login failed" });
-          res.json({ message: "Test login successful", userId: testUserId });
-        });
-      } else {
-        res.status(401).json({ message: "Invalid credentials. Use test@fittracker.com / test123" });
-      }
-    });
-  }
+  // === Test Login ===
+  app.post("/api/test-login", (req: any, res) => {
+    const testEmail = "test@fittracker.com";
+    const testPassword = "test123";
+    const testUserId = "test-user-001";
+    
+    const { email, password } = req.body;
+    
+    if (email === testEmail && password === testPassword) {
+      // Create/upsert test user
+      req.login({ claims: { sub: testUserId, email: testEmail, first_name: "Test", last_name: "User" } }, (err) => {
+        if (err) return res.status(500).json({ message: "Login failed" });
+        res.json({ message: "Test login successful", userId: testUserId });
+      });
+    } else {
+      res.status(401).json({ message: "Invalid credentials. Use test@fittracker.com / test123" });
+    }
+  });
 
   // === Onboarding Routes ===
   app.get(api.onboarding.getProfile.path, isAuthenticated, async (req: any, res) => {
