@@ -16,6 +16,7 @@ import WorkoutDetail from "@/pages/WorkoutDetail";
 import WorkoutTracker from "@/pages/WorkoutTracker";
 import Coach from "@/pages/Coach";
 import Plans from "@/pages/Plans";
+import Statistics from "@/pages/Statistics";
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 
@@ -67,6 +68,9 @@ function Router() {
       </Route>
       <Route path="/plans">
         <ProtectedRoute component={Plans} />
+      </Route>
+      <Route path="/statistics">
+        <ProtectedRoute component={Statistics} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />

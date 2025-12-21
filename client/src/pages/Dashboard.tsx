@@ -3,9 +3,10 @@ import { useCurrentPlan, useProfile } from "@/hooks/use-plans";
 import { Layout } from "@/components/Layout";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkoutCard } from "@/components/WorkoutCard";
+import { Card } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Zap, Flame, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
@@ -85,16 +86,34 @@ export default function Dashboard() {
         }
       />
 
-      {/* Weekly Stats or Streak (Placeholder) */}
+      {/* Weekly Stats */}
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-card p-4 rounded-2xl border border-white/5">
-          <p className="text-xs text-muted-foreground mb-1">Workouts</p>
-          <p className="text-2xl font-display font-bold text-white">12 <span className="text-xs font-normal text-muted-foreground">/ 24</span></p>
-        </div>
-        <div className="bg-card p-4 rounded-2xl border border-white/5">
-          <p className="text-xs text-muted-foreground mb-1">Streak</p>
-          <p className="text-2xl font-display font-bold text-accent">4 Days</p>
-        </div>
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground mb-2">This Week</p>
+          <p className="text-2xl font-bold text-white">2h 20m</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground mb-2">Streak</p>
+          <p className="text-2xl font-bold text-primary flex items-center gap-1">
+            <Flame className="w-5 h-5" />4
+          </p>
+        </Card>
+      </div>
+
+      {/* Quick Stats Row */}
+      <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+        <Card className="flex-shrink-0 p-4 min-w-[150px]">
+          <p className="text-xs text-muted-foreground mb-2">Workouts</p>
+          <p className="text-xl font-bold text-white">12/24</p>
+        </Card>
+        <Card className="flex-shrink-0 p-4 min-w-[150px]">
+          <p className="text-xs text-muted-foreground mb-2">Volume</p>
+          <p className="text-xl font-bold text-primary">2,450 lbs</p>
+        </Card>
+        <Card className="flex-shrink-0 p-4 min-w-[150px]">
+          <p className="text-xs text-muted-foreground mb-2">Sets Done</p>
+          <p className="text-xl font-bold text-accent">48</p>
+        </Card>
       </div>
 
       <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
