@@ -3,13 +3,39 @@ import { useProfile } from "@/hooks/use-plans";
 import { Layout } from "@/components/Layout";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, Settings, User as UserIcon, RotateCcw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const { data: profile } = useProfile();
+  const { toast } = useToast();
+  const [isResetting, setIsResetting] = useState(false);
 
   if (!user) return null;
+
+  const handleResetProfile = async () => {
+    if (!window.confirm("Are you sure you want to reset your profile? This will clear your goal, experience level, and weight.")) {
+      return;
+    }
+    
+    try {
+      setIsResetting(true);
+      const res = await fetch("/api/profile/reset", { method: "POST" });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+        toast({ title: "Profile reset successfully", description: "You can now set up a new profile" });
+      } else {
+        toast({ title: "Error", description: "Failed to reset profile", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to reset profile", variant: "destructive" });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   return (
     <Layout>
@@ -51,6 +77,19 @@ export default function Profile() {
         </Button>
 
         <Button 
+          onClick={handleResetProfile}
+          disabled={isResetting}
+          variant="outline"
+          className="w-full h-14 justify-between px-6 rounded-2xl border border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+          data-testid="button-reset-profile"
+        >
+          <span className="flex items-center gap-3">
+            <RotateCcw className="w-5 h-5" />
+            {isResetting ? "Resetting..." : "Reset Profile"}
+          </span>
+        </Button>
+
+        <Button 
           variant="destructive" 
           onClick={() => logout()}
           className="w-full h-14 justify-between px-6 rounded-2xl"
@@ -62,7 +101,13 @@ export default function Profile() {
         </Button>
       </div>
       
-      <p className="text-center text-xs text-muted-foreground/30 mt-8">
+      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mt-8 mb-4">
+        <p className="text-xs text-orange-400">
+          <span className="font-semibold">Reset Profile Note:</span> This button allows you to reset your profile details for testing different onboarding scenarios. Only available in production.
+        </p>
+      </div>
+      
+      <p className="text-center text-xs text-muted-foreground/30">
         Fit Tracker v1.0.0
       </p>
     </Layout>
