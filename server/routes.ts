@@ -33,8 +33,20 @@ export async function registerRoutes(
     const { email, password } = req.body;
     
     if (email === testEmail && password === testPassword) {
-      // Create/upsert test user
-      req.login({ claims: { sub: testUserId, email: testEmail, first_name: "Test", last_name: "User" } }, (err) => {
+      // Create test user session with proper structure
+      const testUser = {
+        claims: {
+          sub: testUserId,
+          email: testEmail,
+          first_name: "Test",
+          last_name: "User",
+        },
+        access_token: "test-access-token",
+        refresh_token: "test-refresh-token",
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days from now
+      };
+      
+      req.login(testUser, (err) => {
         if (err) return res.status(500).json({ message: "Login failed" });
         res.json({ message: "Test login successful", userId: testUserId });
       });
