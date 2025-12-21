@@ -92,6 +92,16 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/profile/reset", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteProfile(req.user.claims.sub);
+      res.json({ message: "Profile reset successfully" });
+    } catch (err) {
+      console.error("Profile reset error:", err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === Plans Routes ===
   app.get(api.plans.getCurrent.path, isAuthenticated, async (req: any, res) => {
     const plan = await storage.getCurrentPlan(req.user.claims.sub);
