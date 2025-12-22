@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Search, Play, ChevronLeft, BookOpen, Zap } from "lucide-react";
+import { Search, Play, ChevronLeft, BookOpen, Zap, X } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface ExerciseGuide {
@@ -234,10 +234,19 @@ export default function ExerciseLibrary() {
   if (selectedExercise) {
     return (
       <Layout>
-        <PageHeader 
-          title={selectedExercise.name}
-          backHref="/exercises"
-          action={
+        <div className="pt-6 pb-6 sticky top-0 z-30 bg-background/80 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setSelectedExercise(null)}
+                className="p-2 -ml-2 rounded-full hover:bg-white/5 active:bg-white/10 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+              </button>
+              <h1 className="text-2xl font-bold font-display tracking-tight text-white">
+                {selectedExercise.name}
+              </h1>
+            </div>
             <span className={`text-xs px-3 py-1 rounded-full font-bold ${
               selectedExercise.difficulty === 'beginner' ? 'bg-primary/20 text-primary' :
               selectedExercise.difficulty === 'intermediate' ? 'bg-accent/20 text-accent' :
@@ -245,8 +254,8 @@ export default function ExerciseLibrary() {
             }`}>
               {selectedExercise.difficulty.charAt(0).toUpperCase() + selectedExercise.difficulty.slice(1)}
             </span>
-          }
-        />
+          </div>
+        </div>
 
         <div className="space-y-6">
           {/* Video */}
