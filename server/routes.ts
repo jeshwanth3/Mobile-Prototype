@@ -24,26 +24,36 @@ export async function registerRoutes(
   registerChatRoutes(app);
   registerImageRoutes(app);
 
-  // === Test Login (Development Only) ===
-  if (process.env.NODE_ENV === "development") {
-    app.post("/api/test-login", (req: any, res) => {
-      const testEmail = "test@fittracker.com";
-      const testPassword = "test123";
-      const testUserId = "test-user-001";
+  // === Test Login ===
+  app.post("/api/test-login", (req: any, res) => {
+    const testEmail = "test@fittracker.com";
+    const testPassword = "test123";
+    const testUserId = "test-user-001";
+    
+    const { email, password } = req.body;
+    
+    if (email === testEmail && password === testPassword) {
+      // Create test user session with proper structure
+      const testUser = {
+        claims: {
+          sub: testUserId,
+          email: testEmail,
+          first_name: "Test",
+          last_name: "User",
+        },
+        access_token: "test-access-token",
+        refresh_token: "test-refresh-token",
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days from now
+      };
       
-      const { email, password } = req.body;
-      
-      if (email === testEmail && password === testPassword) {
-        // Create/upsert test user
-        req.login({ claims: { sub: testUserId, email: testEmail, first_name: "Test", last_name: "User" } }, (err) => {
-          if (err) return res.status(500).json({ message: "Login failed" });
-          res.json({ message: "Test login successful", userId: testUserId });
-        });
-      } else {
-        res.status(401).json({ message: "Invalid credentials. Use test@fittracker.com / test123" });
-      }
-    });
-  }
+      req.login(testUser, (err) => {
+        if (err) return res.status(500).json({ message: "Login failed" });
+        res.json({ message: "Test login successful", userId: testUserId });
+      });
+    } else {
+      res.status(401).json({ message: "Invalid credentials. Use test@fittracker.com / test123" });
+    }
+  });
 
   // === Onboarding Routes ===
   app.get(api.onboarding.getProfile.path, isAuthenticated, async (req: any, res) => {
@@ -78,6 +88,16 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/profile/reset", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteProfile(req.user.claims.sub);
+      res.json({ message: "Profile reset successfully" });
+    } catch (err) {
+      console.error("Profile reset error:", err);
       res.status(500).json({ message: "Internal Server Error" });
     }
   });

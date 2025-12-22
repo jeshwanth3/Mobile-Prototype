@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Dumbbell, MessageSquare, User } from "lucide-react";
+import { LayoutDashboard, Dumbbell, MessageSquare, User, TrendingUp, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -9,6 +9,8 @@ export function BottomNav() {
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { href: "/plans", icon: Dumbbell, label: "Plans" },
+    { href: "/exercises", icon: BookOpen, label: "Library" },
+    { href: "/statistics", icon: TrendingUp, label: "Stats" },
     { href: "/coach", icon: MessageSquare, label: "Coach" },
     { href: "/profile", icon: User, label: "Profile" },
   ];

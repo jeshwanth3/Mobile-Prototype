@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useWorkout, useLogSet, useCompleteWorkoutLog } from "@/hooks/use-workouts";
 import { Layout } from "@/components/Layout";
@@ -7,35 +7,53 @@ import { ExerciseItem } from "@/components/ExerciseItem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, ArrowRight, Save, Flag } from "lucide-react";
+import { Check, ArrowRight, Save, Flag, Clock, Play, Pause, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Mock data fetching since we need nested query logic for active log + workout details
-// In real app, we would fetch the log first, get the workoutId, then fetch workout details
-// For this MVP prototype, I'll assume we can pass workout ID or fetch it easily.
-
 export default function WorkoutTracker() {
-  const { logId } = useParams(); // This is the active LOG ID
+  const { logId } = useParams();
   const [_, setLocation] = useLocation();
   
-  // HACK: In a real app we'd fetch the log to get the workoutId. 
-  // Here I'm just gonna fetch a workout directly for demonstration.
-  // Assuming workout ID 1 for prototype if not available.
-  const { data: workout } = useWorkout(1); 
-  
+  const { data: workout } = useWorkout(1);
   const logSet = useLogSet();
   const completeLog = useCompleteWorkoutLog();
 
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
-  
-  // Local state for input values to avoid re-rendering entire list
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  
+  // Rest timer state
+  const [restSeconds, setRestSeconds] = useState(0);
+  const [restTimer, setRestTimer] = useState(0);
+  const [isRestActive, setIsRestActive] = useState(false);
 
   const handleInputChange = (exerciseId: number, setNum: number, field: 'weight' | 'reps', value: string) => {
     setInputs(prev => ({
       ...prev,
       [`${exerciseId}-${setNum}-${field}`]: value
     }));
+  };
+
+  // Rest timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRestActive && restTimer > 0) {
+      interval = setInterval(() => {
+        setRestTimer(t => {
+          if (t <= 1) {
+            setIsRestActive(false);
+            // Play a sound notification (optional)
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRestActive, restTimer]);
+
+  const startRest = (seconds: number) => {
+    setRestTimer(seconds);
+    setIsRestActive(true);
   };
 
   const handleLogSet = async (exerciseId: number, setNum: number) => {
@@ -55,6 +73,9 @@ export default function WorkoutTracker() {
         completed: true
       }
     });
+    
+    // Auto-start 90-second rest after logging a set
+    startRest(90);
   };
 
   const handleFinish = async () => {
@@ -80,6 +101,24 @@ export default function WorkoutTracker() {
           </Button>
         }
       />
+
+      {/* Rest Timer */}
+      {isRestActive && restTimer > 0 && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-primary text-black rounded-full px-6 py-3 shadow-lg animate-pulse">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5" />
+            <span className="text-lg font-bold">{restTimer}s</span>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setIsRestActive(false)}
+              className="text-black hover:bg-black/20"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4 pb-32">
         {workout.exercises?.sort((a, b) => a.order - b.order).map((exercise) => (

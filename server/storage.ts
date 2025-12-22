@@ -17,6 +17,7 @@ export interface IStorage extends IAuthStorage, IChatStorage {
   getProfile(userId: string): Promise<UserProfile | undefined>;
   createProfile(profile: InsertUserProfile): Promise<UserProfile>;
   updateProfile(userId: string, profile: Partial<InsertUserProfile>): Promise<UserProfile>;
+  deleteProfile(userId: string): Promise<void>;
 
   // Plans
   getCurrentPlan(userId: string): Promise<Plan | undefined>;
@@ -69,6 +70,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userProfiles.userId, userId))
       .returning();
     return updated;
+  }
+
+  async deleteProfile(userId: string): Promise<void> {
+    await db.delete(userProfiles).where(eq(userProfiles.userId, userId));
   }
 
   // === Plans ===
